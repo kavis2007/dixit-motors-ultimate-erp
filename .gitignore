@@ -1,0 +1,14 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.pub-cache/
+*.iml
+.vscode/
+backend/.env
+backend/*.db
+backend/__pycache__/
+
+sync_debug.log
+sync_full.log

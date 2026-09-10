@@ -1,0 +1,47 @@
+name: dixit_motors_management_app
+description: Dixit Motors Management App - offline first multi-device workshop management.
+publish_to: none
+version: 1.2.0+1
+
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.3.0
+  intl: ^0.20.2
+  shared_preferences: ^2.5.3
+  path_provider: ^2.1.5
+  file_picker: ^10.3.10
+  image_picker: ^1.2.0
+  camera: ^0.12.1
+  google_mlkit_text_recognition: ^0.17.1
+  http: ^1.6.0
+  pdf: ^3.13.0
+  printing: ^5.15.0
+  uuid: ^4.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/app_icon.png
+    - assets/dixit_workshop_background.png
+    - assets/invoice_logo.png
+    - assets/dixit_authorized_signature.png
+
+flutter_launcher_icons:
+  image_path: assets/app_icon.png
+  android: true
+  windows:
+    generate: true
+    image_path: assets/app_icon.png
+  adaptive_icon_background: "#080808"
+  adaptive_icon_foreground: assets/app_icon.png

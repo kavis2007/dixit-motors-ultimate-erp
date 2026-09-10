@@ -1,0 +1,37 @@
+﻿static Map<String, dynamic> _jsonMap(
+  http.Response response,
+  String operation,
+) {
+  final text = _text(response);
+
+  if (text.isEmpty) {
+    throw Exception(
+      '$operation returned an empty response '
+      '(HTTP ${response.statusCode}).',
+    );
+  }
+
+  try {
+    final decoded = jsonDecode(text);
+
+    if (decoded is! Map) {
+      throw Exception(
+        '$operation returned unexpected JSON '
+        '(HTTP ${response.statusCode}).',
+      );
+    }
+
+    return Map<String, dynamic>.from(decoded);
+  } on FormatException {
+    final preview = text.length > 300
+        ? '${text.substring(0, 300)}...'
+        : text;
+
+    throw Exception(
+      '$operation returned non-JSON data '
+      '(HTTP ${response.statusCode}). '
+      'Content-Type: ${response.headers['content-type']}. '
+      'Response: $preview',
+    );
+  }
+}

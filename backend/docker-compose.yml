@@ -1,0 +1,8 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DIXIT_SYNC_KEY: ${DIXIT_SYNC_KEY}
+      DIXIT_DATABASE_URL: ${DIXIT_DATABASE_URL:-sqlite:///./dixit_ultimate.db}
