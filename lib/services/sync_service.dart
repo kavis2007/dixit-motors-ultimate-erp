@@ -52,8 +52,8 @@ class SyncService {
   static http.Client _client() {
     final hc = HttpClient()
       ..autoUncompress = true
-      ..connectionTimeout = const Duration(seconds: 20)
-      ..idleTimeout = const Duration(seconds: 40);
+      ..connectionTimeout = const Duration(seconds: 45)
+      ..idleTimeout = const Duration(seconds: 120);
     return IOClient(hc);
   }
 
