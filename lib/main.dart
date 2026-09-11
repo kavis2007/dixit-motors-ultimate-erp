@@ -1742,6 +1742,41 @@ class _ModulePageState extends State<ModulePage> {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.black,
+                        borderRadius: pw.BorderRadius.circular(4),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.center,
+                        children: [
+                          pw.Text(
+                            'OWNER: Dixit Sharma / Ashok Sharma',
+                            textAlign: pw.TextAlign.center,
+                            style: pw.TextStyle(
+                              color: PdfColors.white,
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 7,
+                            ),
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Text(
+                            'MANAGED BY: Kavi Sharma',
+                            textAlign: pw.TextAlign.center,
+                            style: pw.TextStyle(
+                              color: PdfColors.white,
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 7,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 5),
                     pw.Text(
                       'AUTHORIZED SIGNATORY',
                       style: pw.TextStyle(
