@@ -1,0 +1,18 @@
+databases:
+  - name: dixit-motors-db
+    databaseName: dixit_motors
+    user: dixit_motors
+
+services:
+  - type: web
+    name: dixit-motors-management-api
+    runtime: docker
+    rootDir: backend
+    healthCheckPath: /health
+    envVars:
+      - key: DIXIT_SYNC_KEY
+        sync: false
+      - key: DIXIT_DATABASE_URL
+        fromDatabase:
+          name: dixit-motors-db
+          property: connectionString

@@ -1,12 +1,16 @@
-﻿.dart_tool/
-build/
-installer_output/
+.dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-*.log
+.packages
+build/
+.pub-cache/
+*.iml
+.vscode/
+backend/.env
+backend/*.db
+backend/__pycache__/
 
-# Local backup/debug files
-lib/*.bak
-lib/services/*BACKUP*
-lib/services/*backup*
-lib/services/*jsonmap*
+sync_debug.log
+sync_full.log
+
+installer_output/

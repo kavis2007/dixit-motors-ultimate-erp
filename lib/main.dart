@@ -1,17 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
@@ -245,698 +244,6 @@ class DixitMotorsApp extends StatelessWidget {
         ),
       ),
       home: const HomePage(),
-    );
-  }
-}
-
-String _erpNowDay() => DateFormat('EEEE').format(DateTime.now());
-String _erpNowDate() => DateFormat('yyyy-MM-dd').format(DateTime.now());
-String _erpNowTime() => DateFormat('hh:mm a').format(DateTime.now());
-
-String _erpFileNamePart(String value) {
-  final cleaned = value.trim().replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
-  return cleaned.isEmpty ? 'Unknown' : cleaned;
-}
-
-List<Map<String, dynamic>> _activeRecords(String module) =>
-    LocalStore.get(module).where((r) => r['_deleted'] != true).toList();
-
-String _recordText(Map<String, dynamic> r) => jsonEncode(r).toLowerCase();
-
-Future<void> _upsertCustomerFromJob(Map<String, dynamic> job) async {
-  final name = (job['Customer'] ?? job['Owner Name'] ?? '').toString().trim();
-  if (name.isEmpty) return;
-  final phone = (job['Mobile'] ?? job['Phone'] ?? '').toString().trim();
-  final vehicle = (job['Vehicle'] ?? job['Vehicle Number'] ?? '')
-      .toString()
-      .trim();
-  final km = (job['Current KM'] ?? job['Kilometer'] ?? '').toString().trim();
-
-  final existing = _activeRecords('customers').where((c) {
-    final n = (c['Name'] ?? '').toString().trim().toLowerCase();
-    final p = (c['Phone'] ?? c['Mobile'] ?? '').toString().trim();
-    return n == name.toLowerCase() || (phone.isNotEmpty && p == phone);
-  }).toList();
-
-  final c = existing.isNotEmpty
-      ? Map<String, dynamic>.from(existing.first)
-      : <String, dynamic>{};
-  c['Name'] = name;
-  if (phone.isNotEmpty) c['Phone'] = phone;
-  if (vehicle.isNotEmpty) c['Last Vehicle'] = vehicle;
-  c['Last Service Date'] = job['Date'] ?? _erpNowDate();
-  c['Last Service Day'] = job['Day'] ?? _erpNowDay();
-  c['Last Service Time'] = job['Time'] ?? _erpNowTime();
-  c['Last Kilometer'] = km;
-  c['Total Visits'] =
-      _activeRecords('jobs')
-          .where(
-            (j) =>
-                (j['Customer'] ?? '').toString().trim().toLowerCase() ==
-                name.toLowerCase(),
-          )
-          .length +
-      (existing.isEmpty ? 1 : 0);
-  await LocalStore.upsert('customers', c);
-}
-
-Future<void> _applyInvoiceInventoryDelta(
-  Map<String, dynamic>? oldInvoice,
-  Map<String, dynamic> newInvoice,
-) async {
-  final delta = <String, double>{};
-
-  void addItems(dynamic raw, double multiplier) {
-    if (raw is! List) return;
-    for (final x in raw) {
-      if (x is! Map) continue;
-      final name = (x['name'] ?? x['item'] ?? '')
-          .toString()
-          .trim()
-          .toLowerCase();
-      if (name.isEmpty) continue;
-      final qty =
-          double.tryParse((x['qty'] ?? x['quantity'] ?? 0).toString()) ?? 0;
-      delta[name] = (delta[name] ?? 0) + multiplier * qty;
-    }
-  }
-
-  // Positive delta means stock must be consumed; negative restores stock on edit.
-  addItems(oldInvoice?['Items'], -1);
-  addItems(newInvoice['Items'], 1);
-  if (delta.isEmpty) return;
-
-  for (final inv in _activeRecords('inventory')) {
-    final name = (inv['Part Name'] ?? inv['name'] ?? '')
-        .toString()
-        .trim()
-        .toLowerCase();
-    if (!delta.containsKey(name)) continue;
-    final current = double.tryParse((inv['Quantity'] ?? 0).toString()) ?? 0;
-    final next = (current - delta[name]!).clamp(0, double.infinity);
-    final updated = Map<String, dynamic>.from(inv);
-    updated['Quantity'] = next;
-    updated['Last Movement'] = delta[name]! > 0
-        ? 'Used on invoice ${newInvoice['Invoice Number'] ?? ''}'
-        : 'Invoice edit adjustment';
-    updated['Last Movement Date'] = _erpNowDate();
-    await LocalStore.upsert('inventory', updated);
-  }
-}
-
-Map<String, dynamic> _jobEnriched(Map<String, dynamic> input) {
-  final r = Map<String, dynamic>.from(input);
-  final now = DateTime.now();
-  r['Date'] = (r['Date'] ?? '').toString().trim().isEmpty
-      ? DateFormat('yyyy-MM-dd').format(now)
-      : r['Date'];
-  r['Day'] = (r['Day'] ?? '').toString().trim().isEmpty
-      ? DateFormat('EEEE').format(now)
-      : r['Day'];
-  r['Time'] = (r['Time'] ?? '').toString().trim().isEmpty
-      ? DateFormat('hh:mm a').format(now)
-      : r['Time'];
-  r['Created At'] = r['Created At'] ?? now.toIso8601String();
-  return r;
-}
-
-Future<void> _applyPurchaseInventoryDelta(
-  Map<String, dynamic>? oldPurchase,
-  Map<String, dynamic> purchase,
-) async {
-  final oldPart = (oldPurchase?['Part'] ?? oldPurchase?['Part Name'] ?? '')
-      .toString()
-      .trim();
-  final newPart = (purchase['Part'] ?? purchase['Part Name'] ?? '')
-      .toString()
-      .trim();
-  final oldQty = double.tryParse('${oldPurchase?['Quantity'] ?? 0}') ?? 0;
-  final newQty = double.tryParse('${purchase['Quantity'] ?? 0}') ?? 0;
-  if (oldPart.isEmpty && newPart.isEmpty) return;
-
-  final delta = <String, double>{};
-  if (oldPart.isNotEmpty) delta[oldPart.toLowerCase()] = -oldQty;
-  if (newPart.isNotEmpty)
-    delta[newPart.toLowerCase()] = (delta[newPart.toLowerCase()] ?? 0) + newQty;
-
-  for (final inv in _activeRecords('inventory')) {
-    final name = (inv['Part Name'] ?? '').toString().trim().toLowerCase();
-    if (!delta.containsKey(name)) continue;
-    final current = double.tryParse('${inv['Quantity'] ?? 0}') ?? 0;
-    final updated = Map<String, dynamic>.from(inv);
-    updated['Quantity'] = (current + delta[name]!).clamp(0, double.infinity);
-    updated['Last Movement'] = 'Purchase ${purchase['Invoice Number'] ?? ''}';
-    updated['Last Movement Date'] = _erpNowDate();
-    await LocalStore.upsert('inventory', updated);
-  }
-}
-
-class DashboardGlobalSearch extends StatefulWidget {
-  final void Function(String moduleKey, Map<String, dynamic> record) onOpen;
-  const DashboardGlobalSearch({super.key, required this.onOpen});
-
-  @override
-  State<DashboardGlobalSearch> createState() => _DashboardGlobalSearchState();
-}
-
-class _DashboardGlobalSearchState extends State<DashboardGlobalSearch> {
-  String q = '';
-
-  List<Map<String, dynamic>> get results {
-    final query = q.trim().toLowerCase();
-    if (query.isEmpty) return const [];
-    final out = <Map<String, dynamic>>[];
-    for (final m in moduleDefs) {
-      for (final r in _activeRecords(m.key)) {
-        if (_recordText(r).contains(query)) {
-          out.add({'module': m, 'record': r});
-        }
-      }
-    }
-    return out.take(20).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final rs = results;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          onChanged: (v) => setState(() => q = v),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search_rounded),
-            hintText:
-                'GLOBAL SEARCH Ã¢â‚¬â€ car number, customer, job, invoice, KM, part...',
-            labelText: 'Search all workshop records',
-          ),
-        ),
-        if (rs.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: panel,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0x334B5563)),
-            ),
-            child: Column(
-              children: rs.map((x) {
-                final m = x['module'] as ModuleDef;
-                final r = x['record'] as Map<String, dynamic>;
-                final title =
-                    r['Vehicle Number'] ??
-                    r['Vehicle'] ??
-                    r['Name'] ??
-                    r['Customer'] ??
-                    r['Job Card Number'] ??
-                    r['Invoice Number'] ??
-                    r['Part Name'] ??
-                    r['Service Name'] ??
-                    m.title;
-                return ListTile(
-                  leading: Icon(m.icon, color: brandRed),
-                  title: Text(
-                    title.toString(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    '${m.title}  Ã¢â‚¬Â¢  ${_searchSummary(r)}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-                  onTap: () => widget.onOpen(m.key, r),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-String _searchSummary(Map<String, dynamic> r) {
-  final values = <String>[];
-  for (final k in [
-    'Customer',
-    'Phone',
-    'Mobile',
-    'Model',
-    'Current KM',
-    'Kilometer',
-    'Date',
-    'Day',
-    'Time',
-    'Job Card Number',
-    'Invoice Number',
-    'Quantity',
-  ]) {
-    final v = r[k]?.toString().trim() ?? '';
-    if (v.isNotEmpty) values.add('$k: $v');
-  }
-  return values.take(5).join(' | ');
-}
-
-Future<void> _showVehicle360(BuildContext context, String plate) async {
-  final p = plate.trim().toLowerCase();
-  if (p.isEmpty) return;
-  final vehicles = _activeRecords('vehicles')
-      .where(
-        (v) =>
-            (v['Vehicle Number'] ?? v['Vehicle'] ?? '')
-                .toString()
-                .trim()
-                .toLowerCase() ==
-            p,
-      )
-      .toList();
-  final jobs = _activeRecords('jobs')
-      .where(
-        (j) =>
-            (j['Vehicle'] ?? j['Vehicle Number'] ?? '')
-                .toString()
-                .trim()
-                .toLowerCase() ==
-            p,
-      )
-      .toList();
-  final invoices = _activeRecords('invoices')
-      .where(
-        (i) =>
-            (i['Vehicle Number'] ?? i['Vehicle'] ?? '')
-                .toString()
-                .trim()
-                .toLowerCase() ==
-            p,
-      )
-      .toList();
-  final repairs = jobs
-      .map(
-        (j) =>
-            '${j['Date'] ?? ''} (${j['Day'] ?? ''}) Ã¢â‚¬Â¢ ${j['Complaint'] ?? j['Work Description'] ?? 'Repair'} Ã¢â‚¬Â¢ ${j['Current KM'] ?? ''} KM',
-      )
-      .toList();
-  if (!context.mounted) return;
-  await showDialog<void>(
-    context: context,
-    builder: (c) => AlertDialog(
-      title: Text('Vehicle 360 Ã¢â‚¬Â¢ ${plate.toUpperCase()}'),
-      content: SizedBox(
-        width: 720,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (vehicles.isNotEmpty)
-                Text(
-                  '${vehicles.first['Make'] ?? vehicles.first['Car Name'] ?? ''} ${vehicles.first['Model'] ?? ''} Ã¢â‚¬Â¢ Owner: ${vehicles.first['Customer'] ?? ''} Ã¢â‚¬Â¢ KM: ${vehicles.first['Current KM'] ?? ''}',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-              const SizedBox(height: 12),
-              Text(
-                'Service / Repair History (${jobs.length})',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: brandRed,
-                ),
-              ),
-              ...repairs.map(
-                (x) => Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(x),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Invoices (${invoices.length})',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: brandRed,
-                ),
-              ),
-              ...invoices.map(
-                (x) => Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    '${x['Invoice Number'] ?? ''} Ã¢â‚¬Â¢ ${x['Invoice Date'] ?? ''} Ã¢â‚¬Â¢ Ã¢â€šÂ¹${x['Grand Total'] ?? 0}',
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(c),
-          child: const Text('Close'),
-        ),
-      ],
-    ),
-  );
-}
-
-class DashboardInsights extends StatelessWidget {
-  const DashboardInsights({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final jobs = _activeRecords('jobs');
-    final today = _erpNowDate();
-    final todayJobs = jobs.where((j) => (j['Date'] ?? '') == today).toList();
-    final low = _activeRecords('inventory').where((i) {
-      final q = double.tryParse((i['Quantity'] ?? 0).toString()) ?? 0;
-      final min = double.tryParse((i['Minimum Stock'] ?? 0).toString()) ?? 0;
-      return q <= min;
-    }).toList();
-
-    final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
-    final mondayDate = DateTime(monday.year, monday.month, monday.day);
-    final weekJobs = jobs.where((j) {
-      final d = DateTime.tryParse((j['Date'] ?? '').toString());
-      return d != null && !d.isBefore(mondayDate);
-    }).toList();
-    final weekInvoices = _activeRecords('invoices').where((i) {
-      final d = DateTime.tryParse((i['Invoice Date'] ?? '').toString());
-      return d != null && !d.isBefore(mondayDate);
-    }).toList();
-
-    Widget card(
-      String title,
-      String value,
-      IconData icon, {
-      VoidCallback? onTap,
-    }) {
-      final child = Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: panel,
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: const Color(0x334B5563)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: brandRed),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    title,
-                    style: const TextStyle(color: silver, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-            if (onTap != null)
-              const Icon(Icons.arrow_forward_ios_rounded, size: 13),
-          ],
-        ),
-      );
-      return onTap == null
-          ? child
-          : InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(17),
-              child: child,
-            );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Automatic ERP Insights',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        LayoutBuilder(
-          builder: (context, c) {
-            final cols = c.maxWidth < 650 ? 2 : 4;
-            return GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: cols,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: c.maxWidth < 650 ? 1.55 : 2.1,
-              children: [
-                card(
-                  "Today's vehicles / jobs",
-                  '${todayJobs.length}',
-                  Icons.today_rounded,
-                ),
-                card(
-                  'Low / out-of-stock items',
-                  '${low.length}',
-                  Icons.warning_amber_rounded,
-                  onTap: low.isEmpty
-                      ? null
-                      : () => showDialog<void>(
-                          context: context,
-                          builder: (d) => AlertDialog(
-                            title: const Text('Inventory Low Stock'),
-                            content: SizedBox(
-                              width: 620,
-                              child: ListView(
-                                shrinkWrap: true,
-                                children: low
-                                    .map(
-                                      (i) => ListTile(
-                                        leading: const Icon(
-                                          Icons.inventory_2_outlined,
-                                          color: brandRed,
-                                        ),
-                                        title: Text('${i['Part Name'] ?? ''}'),
-                                        subtitle: Text(
-                                          'Current: ${i['Quantity'] ?? 0} Ã¢â‚¬Â¢ Minimum: ${i['Minimum Stock'] ?? 0}',
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(d),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          ),
-                        ),
-                ),
-                card(
-                  'This week Ã¢â‚¬Â¢ jobs',
-                  '${weekJobs.length}',
-                  Icons.date_range_rounded,
-                ),
-                card(
-                  'This week Ã¢â‚¬Â¢ invoices',
-                  '${weekInvoices.length}',
-                  Icons.receipt_long_rounded,
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class AnalyticsPage extends StatelessWidget {
-  final VoidCallback? onBack;
-  const AnalyticsPage({super.key, this.onBack});
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final start = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(Duration(days: now.weekday - 1));
-    final end = start.add(const Duration(days: 7));
-    final jobs = _activeRecords('jobs').where((j) {
-      final d = DateTime.tryParse('${j['Date'] ?? ''}');
-      return d != null && !d.isBefore(start) && d.isBefore(end);
-    }).toList();
-    final invoices = _activeRecords('invoices').where((i) {
-      final d = DateTime.tryParse('${i['Invoice Date'] ?? ''}');
-      return d != null && !d.isBefore(start) && d.isBefore(end);
-    }).toList();
-    double revenue = 0;
-    for (final i in invoices) {
-      revenue += double.tryParse('${i['Grand Total'] ?? 0}') ?? 0;
-    }
-    final uniqueCars = jobs
-        .map(
-          (j) => '${j['Vehicle'] ?? j['Vehicle Number'] ?? ''}'
-              .trim()
-              .toLowerCase(),
-        )
-        .where((x) => x.isNotEmpty)
-        .toSet()
-        .length;
-    final partsUsed = <String, double>{};
-    for (final inv in invoices) {
-      final raw = inv['Items'];
-      if (raw is! List) continue;
-      for (final x in raw) {
-        if (x is! Map) continue;
-        final n = '${x['name'] ?? x['item'] ?? ''}'.trim();
-        if (n.isEmpty) continue;
-        partsUsed[n] =
-            (partsUsed[n] ?? 0) +
-            (double.tryParse('${x['qty'] ?? x['quantity'] ?? 0}') ?? 0);
-      }
-    }
-
-    Widget stat(String title, String value, IconData icon) => Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: panel,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: brandRed),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 23,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  title,
-                  style: const TextStyle(color: silver, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: onBack ?? () => Navigator.maybePop(context),
-                icon: const Icon(Icons.arrow_back),
-              ),
-              const Expanded(
-                child: Text(
-                  'Weekly Analytics',
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
-                ),
-              ),
-            ],
-          ),
-          Text(
-            'Automatic MondayÃ¢â‚¬â€œSunday report Ã¢â‚¬Â¢ ${DateFormat('dd MMM').format(start)} to ${DateFormat('dd MMM yyyy').format(end.subtract(const Duration(days: 1)))}',
-            style: const TextStyle(color: silver),
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, c) => GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: c.maxWidth < 650 ? 2 : 4,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              children: [
-                stat(
-                  'Vehicles / job entries',
-                  '${jobs.length}',
-                  Icons.directions_car_rounded,
-                ),
-                stat(
-                  'Unique vehicles',
-                  '$uniqueCars',
-                  Icons.car_repair_rounded,
-                ),
-                stat(
-                  'Invoices',
-                  '${invoices.length}',
-                  Icons.receipt_long_rounded,
-                ),
-                stat(
-                  'Revenue',
-                  'Ã¢â€šÂ¹${revenue.toStringAsFixed(0)}',
-                  Icons.currency_rupee_rounded,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: panel,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Parts / materials used this week',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 8),
-                if (partsUsed.isEmpty)
-                  const Text(
-                    'No invoice item usage recorded this week.',
-                    style: TextStyle(color: silver),
-                  )
-                else
-                  ...(() {
-                    final sorted = partsUsed.entries.toList()
-                      ..sort((a, b) => b.value.compareTo(a.value));
-                    return sorted
-                        .map(
-                          (e) => ListTile(
-                            dense: true,
-                            leading: const Icon(
-                              Icons.inventory_2_outlined,
-                              color: brandRed,
-                            ),
-                            title: Text(e.key),
-                            trailing: Text(
-                              e.value.toStringAsFixed(
-                                e.value == e.value.roundToDouble() ? 0 : 2,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList();
-                  })(),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1407,38 +714,10 @@ class _HomePageState extends State<HomePage> {
                 style: const TextStyle(color: silver, fontSize: 11),
               ),
             ),
-          const SizedBox(height: 14),
-          const Text(
-            'WELCOME TO DIXIT MOTORS',
-            style: TextStyle(
-              color: brandRed,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2.4,
-            ),
-          ),
-          const SizedBox(height: 10),
-          DashboardGlobalSearch(
-            onOpen: (key, record) {
-              if (key == 'vehicles') {
-                final plate =
-                    (record['Vehicle Number'] ?? record['Vehicle'] ?? '')
-                        .toString();
-                if (plate.isNotEmpty) {
-                  _showVehicle360(context, plate);
-                  return;
-                }
-              }
-              final index = moduleDefs.indexWhere((m) => m.key == key);
-              if (index >= 0) setState(() => selected = index + 1);
-            },
-          ),
           const SizedBox(height: 20),
           _hero(width),
           const SizedBox(height: 18),
           _metrics(width),
-          const SizedBox(height: 18),
-          const DashboardInsights(),
           const SizedBox(height: 22),
           _quickActions(),
           const SizedBox(height: 22),
@@ -1993,17 +1272,7 @@ class _ModulePageState extends State<ModulePage> {
         ? await showInvoiceEditor(context)
         : await showRecordDialog(context, widget.definition);
     if (result == null) return;
-    final prepared = widget.definition.key == 'jobs'
-        ? _jobEnriched(result)
-        : result;
-    await LocalStore.upsert(widget.definition.key, prepared);
-    if (widget.definition.key == 'jobs') await _upsertCustomerFromJob(prepared);
-    if (widget.definition.key == 'invoices') {
-      await _applyInvoiceInventoryDelta(null, prepared);
-    }
-    if (widget.definition.key == 'purchases') {
-      await _applyPurchaseInventoryDelta(null, prepared);
-    }
+    await LocalStore.upsert(widget.definition.key, result);
     await _log('Created ${widget.definition.title}');
     if (mounted) setState(() {});
     unawaited(_safeBackgroundSync());
@@ -2014,18 +1283,8 @@ class _ModulePageState extends State<ModulePage> {
         ? await showInvoiceEditor(context, initial: record)
         : await showRecordDialog(context, widget.definition, initial: record);
     if (result == null) return;
-    final prepared = widget.definition.key == 'jobs'
-        ? _jobEnriched(result)
-        : result;
-    prepared['_id'] = record['_id'];
-    await LocalStore.upsert(widget.definition.key, prepared);
-    if (widget.definition.key == 'jobs') await _upsertCustomerFromJob(prepared);
-    if (widget.definition.key == 'invoices') {
-      await _applyInvoiceInventoryDelta(record, prepared);
-    }
-    if (widget.definition.key == 'purchases') {
-      await _applyPurchaseInventoryDelta(record, prepared);
-    }
+    result['_id'] = record['_id'];
+    await LocalStore.upsert(widget.definition.key, result);
     await _log('Updated ${widget.definition.title}');
     if (mounted) setState(() {});
     unawaited(_safeBackgroundSync());
@@ -2191,7 +1450,7 @@ class _ModulePageState extends State<ModulePage> {
                       style: const pw.TextStyle(fontSize: 8),
                     ),
                     pw.Text(
-                      'Date: ${r['Invoice Date'] ?? ''} Ã¢â‚¬Â¢ ${r['Invoice Day'] ?? ''} Ã¢â‚¬Â¢ ${r['Invoice Time'] ?? ''}',
+                      'Date: ${r['Invoice Date'] ?? ''}',
                       style: const pw.TextStyle(fontSize: 8),
                     ),
                     pw.Text(
@@ -2584,23 +1843,11 @@ class _ModulePageState extends State<ModulePage> {
     );
 
     final bytes = await doc.save();
-    final owner = _erpFileNamePart(
-      (r['Customer'] ?? r['Owner Name'] ?? 'Owner').toString(),
-    );
-    final plate = _erpFileNamePart(
-      (r['Vehicle Number'] ?? r['Car Number'] ?? r['Vehicle'] ?? 'Vehicle')
-          .toString(),
-    );
-    final fileName = '${owner}_${plate}.pdf';
-    final dir = await getApplicationDocumentsDirectory();
-    final pdfDir = Directory(
-      '${dir.path}${Platform.pathSeparator}Dixit_Motors_PDF',
-    );
-    if (!await pdfDir.exists()) await pdfDir.create(recursive: true);
-    final savedFile = File('${pdfDir.path}${Platform.pathSeparator}$fileName');
-    await savedFile.writeAsBytes(bytes, flush: true);
     if (share) {
-      await Printing.sharePdf(bytes: bytes, filename: fileName);
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: '${r['Invoice Number'] ?? 'invoice'}.pdf',
+      );
     } else {
       await Printing.layoutPdf(onLayout: (_) async => bytes);
     }
@@ -2864,6 +2111,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
   String paymentMode = 'Cash';
   String paymentStatus = 'Unpaid';
   final List<Map<String, dynamic>> items = [];
+  final itemSearch = TextEditingController();
 
   static const catalog = <Map<String, dynamic>>[
     {'name': 'Engine Oil', 'rate': 650.0, 'unit': 'Ltr'},
@@ -2986,224 +2234,15 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     if (mounted) setState(() {});
   }
 
-  List<Map<String, dynamic>> _catalogEntries() {
-    final byName = <String, Map<String, dynamic>>{};
-
-    void add(String name, dynamic rate, String unit, {String type = 'Part'}) {
-      final clean = name.trim();
-      if (clean.isEmpty) return;
-      final key = clean.toLowerCase();
-      byName[key] = {
-        'name': clean,
-        'rate': _num(rate),
-        'unit': unit.trim().isEmpty ? 'Pcs' : unit.trim(),
-        'type': type,
-      };
-    }
-
-    for (final item in catalog) {
-      add(
-        item['name'].toString(),
-        item['rate'],
-        item['unit']?.toString() ?? 'Pcs',
-      );
-    }
-
-    for (final item in LocalStore.get('inventory')) {
-      if (item['_deleted'] == true) continue;
-      add(
-        item['Part Name']?.toString() ?? '',
-        item['Selling Rate'] ?? item['Purchase Rate'] ?? 0,
-        item['Unit']?.toString() ?? 'Pcs',
-        type: 'Part',
-      );
-    }
-
-    for (final service in LocalStore.get('services')) {
-      if (service['_deleted'] == true) continue;
-      add(
-        service['Service Name']?.toString() ?? '',
-        service['Rate'] ?? 0,
-        'Job',
-        type: 'Service',
-      );
-    }
-
-    // Also learn from previous invoices. This makes a manually typed
-    // custom item available in future invoices even if it was not added
-    // to the inventory/service master.
-    for (final invoice in LocalStore.get('invoices')) {
-      if (invoice['_deleted'] == true) continue;
-      final rawItems = invoice['Items'];
-      if (rawItems is! List) continue;
-      for (final raw in rawItems) {
-        if (raw is! Map) continue;
-        add(
-          raw['name']?.toString() ?? raw['item']?.toString() ?? '',
-          raw['rate'] ?? raw['price'] ?? 0,
-          raw['unit']?.toString() ?? 'Pcs',
-        );
-      }
-    }
-
-    final result = byName.values.toList()
-      ..sort(
-        (a, b) => a['name'].toString().toLowerCase().compareTo(
-          b['name'].toString().toLowerCase(),
-        ),
-      );
-    return result;
-  }
-
   void _addCatalog(Map<String, dynamic> item) {
     setState(
       () => items.add({
         'name': item['name'],
         'qty': 1.0,
-        'rate': _num(item['rate']),
-        'unit': item['unit']?.toString() ?? 'Pcs',
+        'rate': item['rate'],
+        'unit': item['unit'],
       }),
     );
-  }
-
-  Future<void> _addNewInvoiceItem() async {
-    final nameController = TextEditingController();
-    final rateController = TextEditingController();
-    final unitController = TextEditingController(text: 'Pcs');
-    String itemType = 'Part';
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.add_box_outlined, color: brandRed),
-              SizedBox(width: 8),
-              Text('Add New Item'),
-            ],
-          ),
-          content: SizedBox(
-            width: 430,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: itemType,
-                  decoration: const InputDecoration(
-                    labelText: 'Item Type',
-                    isDense: true,
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Part',
-                      child: Text('Part / Spare'),
-                    ),
-                    DropdownMenuItem(value: 'Service', child: Text('Service')),
-                  ],
-                  onChanged: (value) {
-                    setDialogState(() => itemType = value ?? 'Part');
-                  },
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: nameController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Item / Service Name',
-                    hintText: 'e.g. Turbo Hose',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: rateController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Default Rate (Rs.)',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: unitController,
-                  decoration: const InputDecoration(
-                    labelText: 'Unit',
-                    hintText: 'Pcs / Ltr / Set / Job',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton.icon(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                final rate = _num(rateController.text);
-                final unit = unitController.text.trim().isEmpty
-                    ? (itemType == 'Service' ? 'Job' : 'Pcs')
-                    : unitController.text.trim();
-
-                if (name.isEmpty) return;
-
-                if (itemType == 'Part') {
-                  await LocalStore.upsert('inventory', {
-                    'Part Name': name,
-                    'Part Number': '',
-                    'Category': 'Custom',
-                    'Supplier': '',
-                    'Purchase Rate': rate,
-                    'Selling Rate': rate,
-                    'Quantity': 0,
-                    'Minimum Stock': 0,
-                    'HSN': '',
-                    'Unit': unit,
-                    'Status': 'Active',
-                  });
-                } else {
-                  await LocalStore.upsert('services', {
-                    'Service Name': name,
-                    'HSN/SAC': '',
-                    'Rate': rate,
-                    'Description': 'Added from invoice',
-                    'Status': 'Active',
-                  });
-                }
-
-                if (dialogContext.mounted) {
-                  Navigator.pop(dialogContext, true);
-                }
-              },
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('Save & Use'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (result != true || !mounted) {
-      nameController.dispose();
-      rateController.dispose();
-      unitController.dispose();
-      return;
-    }
-
-    final savedName = nameController.text.trim();
-    final savedRate = _num(rateController.text);
-    final savedUnit = unitController.text.trim().isEmpty
-        ? (itemType == 'Service' ? 'Job' : 'Pcs')
-        : unitController.text.trim();
-
-    nameController.dispose();
-    rateController.dispose();
-    unitController.dispose();
-
-    _addCatalog({'name': savedName, 'rate': savedRate, 'unit': savedUnit});
   }
 
   Map<String, dynamic> _saveData() => {
@@ -3217,10 +2256,6 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     'Kilometer': km.text.trim(),
     'Next Service KM': nextKm.text.trim(),
     'Invoice Date': date.text.trim(),
-    'Invoice Day': DateTime.tryParse(date.text.trim()) != null
-        ? DateFormat('EEEE').format(DateTime.parse(date.text.trim()))
-        : _erpNowDay(),
-    'Invoice Time': _erpNowTime(),
     'Items': items
         .map(
           (x) => {
@@ -3263,6 +2298,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       tax,
       paid,
       workDone,
+      itemSearch,
     ]) {
       c.dispose();
     }
@@ -3285,6 +2321,13 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final filtered = catalog
+        .where(
+          (x) => x['name'].toString().toLowerCase().contains(
+            itemSearch.text.toLowerCase(),
+          ),
+        )
+        .toList();
     final isCompactMobile = MediaQuery.sizeOf(context).width < 600;
     return AlertDialog(
       insetPadding: EdgeInsets.all(isCompactMobile ? 10 : 24),
@@ -3342,147 +2385,61 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                 ],
               ),
               const Divider(height: 18),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'ITEMS / PARTS / SERVICES',
-                      style: TextStyle(
-                        color: brandRed,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _addNewInvoiceItem,
-                    icon: const Icon(Icons.add_box_outlined),
-                    label: const Text('Add New Item'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: () => setState(
-                      () => items.add({
-                        'name': '',
-                        'qty': 1.0,
-                        'rate': 0.0,
-                        'unit': 'Pcs',
-                      }),
-                    ),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Item'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
               const Text(
-                'Type an item name to get suggestions from Catalog, Inventory, Services and previous invoices.',
-                style: TextStyle(color: silver, fontSize: 11),
+                'ADD ITEM / PART',
+                style: TextStyle(
+                  color: brandRed,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                ),
               ),
-              const SizedBox(height: 10),
+              TextField(
+                controller: itemSearch,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Search oil, oil filter, air filter...',
+                ),
+              ),
+              const SizedBox(height: 7),
+              Wrap(
+                spacing: 7,
+                runSpacing: 7,
+                children: filtered
+                    .map(
+                      (x) => ActionChip(
+                        label: Text('${x['name']} | Rs. ${x['rate']}'),
+                        onPressed: () => _addCatalog(x),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 12),
               if (items.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(12),
                   child: Text(
-                    'No items added. Click Add Item or Add New Item.',
+                    'No items added. Search above and click an item.',
                     style: TextStyle(color: silver),
                   ),
                 ),
               ...items.asMap().entries.map((e) {
                 final i = e.key;
                 final item = e.value;
-
-                void updateItem(String key, dynamic value) {
-                  setState(() => item[key] = value);
-                }
-
-                final suggestions = _catalogEntries();
-                final nameField = Autocomplete<Map<String, dynamic>>(
-                  displayStringForOption: (option) =>
-                      option['name']?.toString() ?? '',
-                  initialValue: TextEditingValue(
-                    text: item['name']?.toString() ?? '',
-                  ),
-                  optionsBuilder: (value) {
-                    final q = value.text.trim().toLowerCase();
-                    if (q.isEmpty) return suggestions.take(12);
-                    return suggestions
-                        .where(
-                          (x) => x['name'].toString().toLowerCase().contains(q),
-                        )
-                        .take(12);
-                  },
-                  onSelected: (selected) {
-                    updateItem('name', selected['name']);
-                    updateItem('rate', _num(selected['rate']));
-                    updateItem('unit', selected['unit']?.toString() ?? 'Pcs');
-                  },
-                  fieldViewBuilder:
-                      (context, controller, focusNode, onFieldSubmitted) {
-                        return TextField(
-                          controller: controller,
-                          focusNode: focusNode,
-                          onChanged: (v) => item['name'] = v,
-                          decoration: const InputDecoration(
-                            labelText: 'Item / Part / Service',
-                            hintText: 'Start typing...',
-                            isDense: true,
-                          ),
-                        );
-                      },
-                  optionsViewBuilder: (context, onSelected, options) {
-                    return Align(
-                      alignment: Alignment.topLeft,
-                      child: Material(
-                        elevation: 8,
-                        color: panel,
-                        borderRadius: BorderRadius.circular(10),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: 520,
-                            maxHeight: 260,
-                          ),
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(6),
-                            shrinkWrap: true,
-                            itemCount: options.length,
-                            itemBuilder: (context, index) {
-                              final option = options.elementAt(index);
-                              return ListTile(
-                                dense: true,
-                                leading: const Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 20,
-                                ),
-                                title: Text(option['name'].toString()),
-                                subtitle: Text(
-                                  '${option['type'] ?? 'Item'} Ã¢â‚¬Â¢ ${option['unit'] ?? 'Pcs'} Ã¢â‚¬Â¢ Rs. ${_num(option['rate']).toStringAsFixed(2)}',
-                                ),
-                                onTap: () => onSelected(option),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-
                 final qtyField = SizedBox(
-                  width: isCompactMobile ? 100 : 80,
+                  width: isCompactMobile ? 105 : 80,
                   child: TextFormField(
                     initialValue: _num(item['qty']).toString(),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    onChanged: (v) => updateItem('qty', _num(v)),
+                    onChanged: (v) => setState(() => item['qty'] = _num(v)),
                     decoration: const InputDecoration(
                       labelText: 'Qty',
                       isDense: true,
                     ),
                   ),
                 );
-
                 final rateField = SizedBox(
                   width: isCompactMobile ? 125 : 110,
                   child: TextFormField(
@@ -3490,19 +2447,21 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    onChanged: (v) => updateItem('rate', _num(v)),
+                    onChanged: (v) => setState(() => item['rate'] = _num(v)),
                     decoration: const InputDecoration(
                       labelText: 'Rate Rs.',
                       isDense: true,
                     ),
                   ),
                 );
-
-                final amount = _num(item['qty']) * _num(item['rate']);
-
+                final amount = Text(
+                  'Rs. ${(_num(item['qty']) * _num(item['rate'])).toStringAsFixed(2)}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                );
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(10),
+                  margin: const EdgeInsets.only(bottom: 7),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     border: Border.all(color: const Color(0x334B5563)),
                     borderRadius: BorderRadius.circular(10),
@@ -3513,15 +2472,24 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  '#${i + 1}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
+                                SizedBox(
+                                  width: 28,
+                                  child: Text(
+                                    '${i + 1}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                    ),
                                   ),
                                 ),
-                                const Spacer(),
+                                Expanded(
+                                  child: Text(
+                                    item['name'].toString(),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
                                 IconButton(
-                                  tooltip: 'Delete item',
                                   onPressed: () =>
                                       setState(() => items.removeAt(i)),
                                   icon: const Icon(
@@ -3531,29 +2499,18 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                                 ),
                               ],
                             ),
-                            nameField,
-                            const SizedBox(height: 8),
                             Row(
                               children: [
-                                qtyField,
+                                Expanded(child: qtyField),
                                 const SizedBox(width: 8),
-                                rateField,
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'Rs. ${amount.toStringAsFixed(2)}',
-                                    textAlign: TextAlign.right,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ),
+                                Expanded(child: rateField),
+                                const SizedBox(width: 8),
+                                Expanded(child: amount),
                               ],
                             ),
                           ],
                         )
                       : Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             SizedBox(
                               width: 28,
@@ -3564,24 +2521,20 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                                 ),
                               ),
                             ),
-                            Expanded(child: nameField),
-                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                item['name'].toString(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
                             qtyField,
                             const SizedBox(width: 8),
                             rateField,
                             const SizedBox(width: 12),
-                            SizedBox(
-                              width: 110,
-                              child: Text(
-                                'Rs. ${amount.toStringAsFixed(2)}',
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
+                            SizedBox(width: 105, child: amount),
                             IconButton(
-                              tooltip: 'Delete item',
                               onPressed: () =>
                                   setState(() => items.removeAt(i)),
                               icon: const Icon(
@@ -3698,76 +2651,20 @@ class GlobalSearchPage extends StatefulWidget {
 
 class _GlobalSearchPageState extends State<GlobalSearchPage> {
   String q = '';
-
-  List<Map<String, dynamic>> get results {
-    final query = q.trim().toLowerCase();
-    if (query.isEmpty) return const [];
-    final out = <Map<String, dynamic>>[];
-    for (final m in moduleDefs) {
-      for (final r in _activeRecords(m.key)) {
-        if (_recordText(r).contains(query)) out.add({'module': m, 'record': r});
-      }
-    }
-    return out;
-  }
-
-  Future<void> _open(String key, Map<String, dynamic> r) async {
-    if (key == 'vehicles') {
-      final plate = (r['Vehicle Number'] ?? r['Vehicle'] ?? '').toString();
-      if (plate.isNotEmpty) {
-        await _showVehicle360(context, plate);
-        return;
-      }
-    }
-    if (key == 'jobs') {
-      final plate = (r['Vehicle'] ?? r['Vehicle Number'] ?? '').toString();
-      if (plate.isNotEmpty) {
-        await _showVehicle360(context, plate);
-        return;
-      }
-    }
-    if (key == 'invoices') {
-      await showDialog<void>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: Text('Invoice Ã¢â‚¬Â¢ ${r['Invoice Number'] ?? ''}'),
-          content: SizedBox(
-            width: 700,
-            child: SingleChildScrollView(child: Text(_searchSummary(r))),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(c),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      await showDialog<void>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: Text(key.toUpperCase()),
-          content: SizedBox(
-            width: 700,
-            child: SingleChildScrollView(
-              child: Text(const JsonEncoder.withIndent('  ').convert(r)),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(c),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final rs = results;
+    final results = <Map<String, dynamic>>[];
+    if (q.trim().isNotEmpty) {
+      for (final m in moduleDefs) {
+        for (final r in LocalStore.get(
+          m.key,
+        ).where((x) => x['_deleted'] != true)) {
+          if (jsonEncode(r).toLowerCase().contains(q.toLowerCase())) {
+            results.add({'module': m.title, 'icon': m.icon, 'record': r});
+          }
+        }
+      }
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -3792,7 +2689,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                       ),
                     ),
                     Text(
-                      'Search every customer, vehicle, job, invoice, KM, part, service and purchase.',
+                      'Search customers, cars, jobs, invoices, payments and staff.',
                       style: TextStyle(color: silver),
                     ),
                   ],
@@ -3802,57 +2699,56 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
           ),
           const SizedBox(height: 18),
           TextField(
-            autofocus: true,
             onChanged: (v) => setState(() => q = v),
             decoration: const InputDecoration(
               prefixIcon: Icon(Icons.search),
-              hintText:
-                  'Car number / customer / mobile / job / invoice / KM / part...',
+              hintText: 'Search name, mobile, plate, job no., invoice no....',
             ),
           ),
           const SizedBox(height: 15),
-          if (q.trim().isNotEmpty)
+          if (q.isNotEmpty)
             Text(
-              '${rs.length} result(s)',
+              '${results.length} result(s)',
               style: const TextStyle(color: silver),
             ),
-          const SizedBox(height: 8),
-          ...rs.take(100).map((x) {
-            final m = x['module'] as ModuleDef;
-            final r = x['record'] as Map<String, dynamic>;
-            final title =
-                r['Vehicle Number'] ??
-                r['Vehicle'] ??
-                r['Name'] ??
-                r['Customer'] ??
-                r['Job Card Number'] ??
-                r['Invoice Number'] ??
-                r['Part Name'] ??
-                r['Service Name'] ??
-                m.title;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: panel,
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: ListTile(
-                leading: Icon(m.icon, size: 24, color: brandRed),
-                title: Text(
-                  title.toString(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          ...results
+              .take(100)
+              .map(
+                (x) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: panel,
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(x['icon'] as IconData, size: 24, color: brandRed),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              x['module'],
+                              style: const TextStyle(
+                                color: brandRed,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              jsonEncode(x['record']),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                subtitle: Text(
-                  '${m.title} Ã¢â‚¬Â¢ ${_searchSummary(r)}',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: const Icon(Icons.open_in_new_rounded),
-                onTap: () => _open(m.key, r),
               ),
-            );
-          }),
         ],
       ),
     );
@@ -3889,8 +2785,6 @@ List<String> fieldsFor(String key) {
         'Customer',
         'Vehicle',
         'Date',
-        'Day',
-        'Time',
         'Current KM',
         'Complaint',
         'Work Description',
@@ -3977,8 +2871,6 @@ List<String> fieldsFor(String key) {
         'Kilometer',
         'Next Service KM',
         'Invoice Date',
-        'Invoice Day',
-        'Invoice Time',
         'Items',
         'Subtotal',
         'Discount',
@@ -4075,14 +2967,6 @@ class _RecordDialogState extends State<RecordDialog> {
           ).format(DateTime.now());
         }
       }
-      if (controllers.containsKey('Day'))
-        controllers['Day']!.text = _erpNowDay();
-      if (controllers.containsKey('Time'))
-        controllers['Time']!.text = _erpNowTime();
-      if (controllers.containsKey('Invoice Day'))
-        controllers['Invoice Day']!.text = _erpNowDay();
-      if (controllers.containsKey('Invoice Time'))
-        controllers['Invoice Time']!.text = _erpNowTime();
     }
   }
 
@@ -4195,165 +3079,6 @@ class _RecordDialogState extends State<RecordDialog> {
     if (controllers.containsKey('Status')) data['Status'] = status;
     if (controllers.containsKey('Job Status')) data['Job Status'] = status;
     Navigator.pop(context, data);
-  }
-}
-
-class PurchaseBillScanPage extends StatefulWidget {
-  final VoidCallback? onBack;
-  const PurchaseBillScanPage({super.key, this.onBack});
-  @override
-  State<PurchaseBillScanPage> createState() => _PurchaseBillScanPageState();
-}
-
-class _PurchaseBillScanPageState extends State<PurchaseBillScanPage> {
-  final picker = ImagePicker();
-  String status =
-      'Select a supplier bill image. Android can OCR the bill; Windows stores the selected bill for review.';
-  bool busy = false;
-
-  Future<void> _scan() async {
-    setState(() => busy = true);
-    try {
-      final image = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 90,
-      );
-      if (image == null) return;
-      if (!Platform.isAndroid) {
-        setState(
-          () => status =
-              'Bill image selected: ${image.path}. Windows OCR is not enabled in this build; add the purchase lines in Purchases for stock posting.',
-        );
-        return;
-      }
-      final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final result = await recognizer.processImage(
-        InputImage.fromFilePath(image.path),
-      );
-      await recognizer.close();
-      final text = result.text.trim();
-      if (text.isEmpty) {
-        setState(
-          () => status = 'No readable text found. Use a clearer bill image.',
-        );
-        return;
-      }
-      // Keep OCR text in the purchase record so it can be reviewed and corrected.
-      await LocalStore.upsert('purchases', {
-        'Supplier': '',
-        'Invoice Number': '',
-        'Date': _erpNowDate(),
-        'Bill Image': image.path,
-        'OCR Text': text,
-        'Status': 'Scanned - Review Required',
-      });
-      if (mounted) {
-        setState(
-          () => status =
-              'Bill scanned and saved in Purchases. Review the OCR text before posting stock.',
-        );
-      }
-    } catch (e) {
-      if (mounted) setState(() => status = 'Purchase scan error: $e');
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    padding: const EdgeInsets.all(24),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: widget.onBack ?? () => Navigator.maybePop(context),
-              icon: const Icon(Icons.arrow_back),
-            ),
-            const Expanded(
-              child: Text(
-                'Purchase Bill Scanner',
-                style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Scan / import a supplier bill, save OCR text, then post verified quantities to inventory.',
-          style: TextStyle(color: silver),
-        ),
-        const SizedBox(height: 18),
-        FilledButton.icon(
-          onPressed: busy ? null : _scan,
-          icon: const Icon(Icons.document_scanner_rounded),
-          label: Text(busy ? 'Scanning...' : 'Scan / Import Bill'),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: panel,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            status,
-            style: const TextStyle(color: silver, height: 1.45),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class PurchaseModulePage extends StatefulWidget {
-  final VoidCallback? onBack;
-  const PurchaseModulePage({super.key, this.onBack});
-  @override
-  State<PurchaseModulePage> createState() => _PurchaseModulePageState();
-}
-
-class _PurchaseModulePageState extends State<PurchaseModulePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(22, 16, 22, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Purchases',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PurchaseBillScanPage(),
-                  ),
-                ),
-                icon: const Icon(Icons.document_scanner_rounded),
-                label: const Text('Scan Bill'),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ModulePage(
-            definition: moduleDefs.firstWhere((m) => m.key == 'purchases'),
-            onBack: widget.onBack,
-          ),
-        ),
-      ],
-    );
   }
 }
 
@@ -5960,24 +4685,6 @@ class SettingsPage extends StatelessWidget {
                     'Download the central cloud data to this device',
                   ),
                   onTap: () => _restoreCloud(context),
-                ),
-              ]),
-
-              _section('App Session', [
-                ListTile(
-                  leading: const Icon(Icons.logout_rounded, color: brandRed),
-                  title: const Text('Logout / Close Session'),
-                  subtitle: const Text(
-                    'Close the current Dixit Motors app session',
-                  ),
-                  onTap: () async {
-                    if (await confirmDialog(
-                      context,
-                      'Logout and close Dixit Motors?',
-                    )) {
-                      await SystemNavigator.pop();
-                    }
-                  },
                 ),
               ]),
 
