@@ -63,8 +63,7 @@ const moduleDefs = <ModuleDef>[
     title: 'Vehicles',
     icon: Icons.directions_car_filled_rounded,
     colorHex: '#BFC4CC',
-    description:
-        'Vehicle 360ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°, KM, photos and service history.',
+    description: 'Vehicle 360 - KM, photos and service history.',
   ),
   ModuleDef(
     key: 'bookings',
@@ -207,9 +206,8 @@ Map<String, dynamic> _decodeJsonMap(http.Response response, String operation) {
     }
     return Map<String, dynamic>.from(decoded);
   } on FormatException {
-    final preview = text.length > 300
-        ? '${text.substring(0, 300)}ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦'
-        : text;
+    final preview = text.length > 300 ? '${text.substring(0, 300)}...' : text;
+
     throw Exception(
       '$operation returned non-JSON data (HTTP ${response.statusCode}). Response: $preview',
     );
@@ -619,18 +617,31 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _pageContent(double width) {
-    if (selected == 0) return _dashboard(width);
-    if (selected == 900)
+    if (selected == 0) {
+      return _dashboard(width);
+    }
+
+    if (selected == 900) {
       return ScannerPage(onBack: () => setState(() => selected = 0));
-    if (selected == 903)
+    }
+
+    if (selected == 903) {
       return GlobalSearchPage(onBack: () => setState(() => selected = 0));
-    if (selected == 901)
+    }
+
+    if (selected == 901) {
       return SyncPage(onBack: () => setState(() => selected = 0));
-    if (selected == 902)
+    }
+
+    if (selected == 902) {
       return SettingsPage(onBack: () => setState(() => selected = 0));
+    }
+
     final index = selected - 1;
+
     if (index >= 0 && index < moduleDefs.length) {
       final key = moduleDefs[index].key;
+
       if (key == 'attendance') {
         return AttendancePage(onBack: () => setState(() => selected = 0));
       }
@@ -668,7 +679,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               );
-              if (compact)
+              if (compact) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -677,14 +688,11 @@ class _HomePageState extends State<HomePage> {
                     FilledButton.icon(
                       onPressed: syncing ? null : _manualSync,
                       icon: const Icon(Icons.cloud_sync),
-                      label: Text(
-                        syncing
-                            ? 'SyncingÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦'
-                            : 'Sync Now',
-                      ),
+                      label: Text(syncing ? 'Syncing...' : 'Sync Now'),
                     ),
                   ],
                 );
+              }
               return Row(
                 children: [
                   Expanded(child: title),
@@ -692,11 +700,7 @@ class _HomePageState extends State<HomePage> {
                   FilledButton.icon(
                     onPressed: syncing ? null : _manualSync,
                     icon: const Icon(Icons.cloud_sync),
-                    label: Text(
-                      syncing
-                          ? 'SyncingÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦'
-                          : 'Sync Now',
-                    ),
+                    label: Text(syncing ? 'Syncing...' : 'Sync Now'),
                   ),
                 ],
               );
@@ -743,7 +747,7 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'DIXIT MOTORS ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ MANAGEMENT APP',
+                  'DIXIT MOTORS MANAGEMENT APP',
                   style: TextStyle(
                     color: brandRed,
                     fontWeight: FontWeight.w800,
@@ -1140,8 +1144,7 @@ class _ModulePageState extends State<ModulePage> {
             onChanged: (v) => setState(() => query = v),
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
-              hintText:
-                  'Search ${widget.definition.title.toLowerCase()}ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦',
+              hintText: 'Search ${widget.definition.title.toLowerCase()}',
             ),
           ),
           const SizedBox(height: 14),
@@ -1505,7 +1508,7 @@ class _ModulePageState extends State<ModulePage> {
             ),
             pw.SizedBox(height: 12),
 
-            // Clean item table ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â no Add Item/Search panel on the printed bill.
+            // Clean item table no Add Item/Search panel on the printed bill.
             pw.Container(
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: PdfColor.fromInt(0xFFB9BDC5)),
@@ -1936,16 +1939,9 @@ class _ModulePageState extends State<ModulePage> {
 
   double _number(dynamic value) {
     if (value is num) return value.toDouble();
+
     return double.tryParse(
-          value
-                  ?.toString()
-                  .replaceAll(',', '')
-                  .replaceAll(
-                    'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹',
-                    '',
-                  )
-                  .trim() ??
-              '',
+          value?.toString().replaceAll(',', '').trim() ?? '',
         ) ??
         0;
   }
@@ -2150,18 +2146,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
   }
 
   double _num(dynamic x) =>
-      double.tryParse(
-        x
-                ?.toString()
-                .replaceAll(',', '')
-                .replaceAll(
-                  'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹',
-                  '',
-                )
-                .trim() ??
-            '',
-      ) ??
-      0;
+      double.tryParse(x?.toString().replaceAll(',', '').trim() ?? '') ?? 0;
   double get subtotal =>
       items.fold<double>(0, (s, x) => s + (_num(x['qty']) * _num(x['rate'])));
   double get total => subtotal - _num(discount.text) + _num(tax.text);
@@ -2262,6 +2247,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
   @override
   void dispose() {
     jobNo.removeListener(_jobLookup);
+
     for (final c in [
       invoiceNo,
       jobNo,
@@ -2278,8 +2264,10 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       paid,
       workDone,
       itemSearch,
-    ])
+    ]) {
       c.dispose();
+    }
+
     super.dispose();
   }
 
@@ -2326,10 +2314,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                   Expanded(child: _input(invoiceNo, 'Invoice No.')),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _input(
-                      jobNo,
-                      'Job No. ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â auto-fill customer & car',
-                    ),
+                    child: _input(jobNo, 'Job No. - auto-fill customer & car'),
                   ),
                 ],
               ),
@@ -2639,8 +2624,9 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
         for (final r in LocalStore.get(
           m.key,
         ).where((x) => x['_deleted'] != true)) {
-          if (jsonEncode(r).toLowerCase().contains(q.toLowerCase()))
+          if (jsonEncode(r).toLowerCase().contains(q.toLowerCase())) {
             results.add({'module': m.title, 'icon': m.icon, 'record': r});
+          }
         }
       }
     }
@@ -2940,17 +2926,20 @@ class _RecordDialogState extends State<RecordDialog> {
         'Payment Date',
         'Expense Date',
       ]) {
-        if (controllers.containsKey(f))
+        if (controllers.containsKey(f)) {
           controllers[f]!.text = DateFormat(
             'yyyy-MM-dd',
           ).format(DateTime.now());
+        }
       }
     }
   }
 
   @override
   void dispose() {
-    for (final c in controllers.values) c.dispose();
+    for (final c in controllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -3175,7 +3164,7 @@ class _ScannerPageState extends State<ScannerPage> {
                   leading: const Icon(Icons.directions_car),
                   title: Text('${v['Make'] ?? ''} ${v['Model'] ?? ''}'),
                   subtitle: Text(
-                    '${v['Customer'] ?? ''} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${v['Current KM'] ?? ''} KM',
+                    '${v['Customer'] ?? ''} ${v['Current KM'] ?? ''} KM',
                   ),
                 ),
               ),
@@ -3188,22 +3177,22 @@ class _ScannerPageState extends State<ScannerPage> {
                 (j) => ListTile(
                   leading: const Icon(Icons.build),
                   title: Text(j['Job Card Number']?.toString() ?? 'Job Card'),
-                  subtitle: Text(
-                    '${j['Date'] ?? ''} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${j['Job Status'] ?? ''}',
-                  ),
+                  subtitle: Text('${j['Date'] ?? ''} ${j['Job Status'] ?? ''}'),
                 ),
               ),
               const Divider(),
+
               Text(
                 'Invoice History (${invoices.length})',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
+
               ...invoices.map(
                 (i) => ListTile(
                   leading: const Icon(Icons.receipt_long),
                   title: Text(i['Invoice Number']?.toString() ?? 'Invoice'),
                   subtitle: Text(
-                    'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ ${i['Grand Total'] ?? ''} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${i['Payment Status'] ?? ''}',
+                    '${i['Grand Total'] ?? ''} - ${i['Payment Status'] ?? ''}',
                   ),
                 ),
               ),
@@ -3352,12 +3341,11 @@ class _AttendancePageState extends State<AttendancePage> {
       text: old['Check Out']?.toString() ?? '',
     );
     final notesC = TextEditingController(text: old['Notes']?.toString() ?? '');
+
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(
-          '${DateFormat('dd MMM yyyy').format(d)} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ $w',
-        ),
+        title: Text('${DateFormat('dd MMM yyyy').format(d)} - $w'),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -3365,7 +3353,7 @@ class _AttendancePageState extends State<AttendancePage> {
             children: [
               ValueListenableBuilder<String>(
                 valueListenable: statusCtrl,
-                builder: (_, v, __) => DropdownButtonFormField<String>(
+                builder: (_, v, _) => DropdownButtonFormField<String>(
                   initialValue: v,
                   items: const ['Present', 'Absent', 'Half Day', 'Leave']
                       .map((x) => DropdownMenuItem(value: x, child: Text(x)))
@@ -3460,8 +3448,9 @@ class _AttendancePageState extends State<AttendancePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (worker.isEmpty && workers.isNotEmpty)
+    if (worker.isEmpty && workers.isNotEmpty) {
       worker = workers.first['Worker Name'].toString();
+    }
     final w = worker;
     final rows = dates;
     final counts = {'Present': 0, 'Absent': 0, 'Half Day': 0, 'Leave': 0};
@@ -3654,6 +3643,7 @@ class _AttendancePageState extends State<AttendancePage> {
             ),
           ),
           const SizedBox(height: 8),
+
           ...history
               .take(100)
               .map(
@@ -3664,10 +3654,10 @@ class _AttendancePageState extends State<AttendancePage> {
                     color: statusColor(r['Status']?.toString() ?? ''),
                   ),
                   title: Text(
-                    '${r['Worker Name'] ?? ''} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${r['Status'] ?? ''}',
+                    '${r['Worker Name'] ?? ''} - ${r['Status'] ?? ''}',
                   ),
                   subtitle: Text(
-                    '${r['Date'] ?? ''} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${r['Check In'] ?? ''} - ${r['Check Out'] ?? ''}',
+                    '${r['Date'] ?? ''} - ${r['Check In'] ?? ''} - ${r['Check Out'] ?? ''}',
                   ),
                 ),
               ),
@@ -3707,28 +3697,38 @@ class _DeviceManagementPageState extends State<DeviceManagementPage> {
       busy = true;
       error = '';
     });
+
     try {
       final s = await SyncService.settings();
       final base = s['url'] ?? '';
       final key = s['key'] ?? '';
-      if (base.isEmpty || key.isEmpty)
+
+      if (base.isEmpty || key.isEmpty) {
         throw Exception('Cloud Sync is not configured.');
+      }
+
       final r = await http
           .get(
             Uri.parse('$base/api/devices'),
             headers: {'X-Sync-Key': key, 'Accept-Encoding': 'identity'},
           )
           .timeout(const Duration(seconds: 12));
-      if (r.statusCode >= 300)
+
+      if (r.statusCode >= 300) {
         throw Exception('Cloud error ${r.statusCode}: ${r.body}');
+      }
+
       final body = _decodeJsonMap(r, 'Cloud device list');
+
       devices = (body['devices'] as List? ?? const [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
     } catch (e) {
       error = e.toString();
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() => busy = false);
+      }
     }
   }
 
@@ -3741,6 +3741,7 @@ class _DeviceManagementPageState extends State<DeviceManagementPage> {
       final base = s['url'] ?? '';
       final key = s['key'] ?? '';
       final endpoint = blocked ? 'block' : 'unblock';
+
       final r = await http
           .post(
             Uri.parse('$base/api/devices/$endpoint'),
@@ -3752,24 +3753,32 @@ class _DeviceManagementPageState extends State<DeviceManagementPage> {
             body: jsonEncode({'device_id': d['device_id']}),
           )
           .timeout(const Duration(seconds: 12));
-      if (r.statusCode >= 300) throw Exception(r.body);
+
+      if (r.statusCode >= 300) {
+        throw Exception(r.body);
+      }
+
       await _load();
-      if (mounted)
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(blocked ? 'Device blocked.' : 'Device unblocked.'),
           ),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Device action failed: $e')));
+      }
     }
   }
 
   String _lastSeen(dynamic v) {
     final dt = DateTime.tryParse(v?.toString() ?? '');
+
     return dt == null
         ? 'Never'
         : DateFormat('dd MMM yyyy, hh:mm a').format(dt.toLocal());
@@ -4015,17 +4024,22 @@ class _LivePlateScannerPageState extends State<LivePlateScannerPage> {
     if (processing ||
         DateTime.now().difference(lastRun).inMilliseconds < 750 ||
         controller == null ||
-        !controller!.value.isInitialized)
+        !controller!.value.isInitialized) {
       return;
+    }
+
     processing = true;
     lastRun = DateTime.now();
+
     try {
       final plane = image.planes.first;
+
       final rotation =
           InputImageRotationValue.fromRawValue(
             controller!.description.sensorOrientation,
           ) ??
           InputImageRotation.rotation0deg;
+
       final input = InputImage.fromBytes(
         bytes: plane.bytes,
         metadata: InputImageMetadata(
@@ -4035,17 +4049,22 @@ class _LivePlateScannerPageState extends State<LivePlateScannerPage> {
           bytesPerRow: plane.bytesPerRow,
         ),
       );
+
       final text = await recognizer!.processImage(input);
       final plate = _extractPlate(text.text);
+
       if (plate != null && mounted) {
         await controller!.stopImageStream();
         await controller!.dispose();
         await recognizer!.close();
-        if (mounted) Navigator.pop(context, plate);
+
+        if (mounted) {
+          Navigator.pop(context, plate);
+        }
       } else if (mounted) {
         setState(
           () => status = text.text.isEmpty
-              ? 'ScanningÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦'
+              ? 'Scanning...'
               : 'Detected text: ${text.text.replaceAll('\n', ' ')}',
         );
       }
@@ -4058,15 +4077,19 @@ class _LivePlateScannerPageState extends State<LivePlateScannerPage> {
 
   String? _extractPlate(String text) {
     final cleaned = text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9\n]'), '\n');
+
     final candidates = cleaned
         .split(RegExp(r'\n+'))
         .map((e) => e.trim())
         .where((e) => e.length >= 8 && e.length <= 12);
+
     for (final c in candidates) {
       if (RegExp(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{3,4}$').hasMatch(c) ||
-          RegExp(r'^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$').hasMatch(c))
+          RegExp(r'^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$').hasMatch(c)) {
         return c;
+      }
     }
+
     return null;
   }
 
@@ -4229,21 +4252,20 @@ class _SyncPageState extends State<SyncPage> {
                 style: TextStyle(color: silver),
               ),
               const SizedBox(height: 20),
+
               _input(url, 'API URL', 'https://your-server.example'),
               _input(key, 'Sync Key', 'Private key from backend', secret: true),
               _input(device, 'Device Name', 'Admin Laptop / Mobile 01'),
               _input(user, 'User Name', 'Dixit Admin / Staff'),
+
               const SizedBox(height: 6),
+
               Row(
                 children: [
                   FilledButton.icon(
                     onPressed: busy ? null : _sync,
                     icon: const Icon(Icons.cloud_sync),
-                    label: Text(
-                      busy
-                          ? 'SyncingÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦'
-                          : 'Save & Sync',
-                    ),
+                    label: Text(busy ? 'Syncing...' : 'Save & Sync'),
                   ),
                   const SizedBox(width: 10),
                   OutlinedButton(
@@ -4252,12 +4274,15 @@ class _SyncPageState extends State<SyncPage> {
                   ),
                 ],
               ),
+
               if (message.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 14),
                   child: Text(message, style: const TextStyle(color: silver)),
                 ),
+
               const SizedBox(height: 24),
+
               Container(
                 padding: const EdgeInsets.all(17),
                 decoration: BoxDecoration(
@@ -4306,23 +4331,37 @@ class _SyncPageState extends State<SyncPage> {
 
 class SettingsPage extends StatelessWidget {
   final VoidCallback? onBack;
+
   const SettingsPage({super.key, this.onBack});
 
   Future<void> _backup(BuildContext context) async {
-    final json = await LocalStore.exportJson();
-    final path = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save Dixit Motors backup',
-      fileName:
-          'dixit_motors_backup_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.json',
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
-    if (path == null) return;
-    await File(path).writeAsString(json, flush: true);
-    if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Backup saved successfully.')),
+    try {
+      final json = await LocalStore.exportJson();
+
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Dixit Motors backup',
+        fileName:
+            'dixit_motors_backup_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
       );
+
+      if (path == null) return;
+
+      await File(path).writeAsString(json, flush: true);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Backup saved successfully.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Backup error: $e')));
+      }
+    }
   }
 
   Future<void> _cloudBackup(BuildContext context) async {
@@ -4330,16 +4369,26 @@ class SettingsPage extends StatelessWidget {
       final s = await SyncService.settings();
       final base = s['url'] ?? '';
       final key = s['key'] ?? '';
-      if (base.isEmpty || key.isEmpty)
+
+      if (base.isEmpty || key.isEmpty) {
         throw Exception('Cloud Sync is not configured.');
+      }
+
       final r = await http
           .get(
             Uri.parse('$base/api/backup/export'),
-            headers: {'X-Sync-Key': key, 'Accept-Encoding': 'identity'},
+            headers: {
+              'X-Sync-Key': key,
+              'Accept': 'application/json',
+              'Accept-Encoding': 'identity',
+            },
           )
-          .timeout(const Duration(seconds: 20));
-      if (r.statusCode >= 300)
+          .timeout(const Duration(seconds: 30));
+
+      if (r.statusCode >= 300) {
         throw Exception('Cloud backup failed (${r.statusCode}): ${r.body}');
+      }
+
       final path = await FilePicker.platform.saveFile(
         dialogTitle: 'Save Dixit Motors cloud backup',
         fileName:
@@ -4347,66 +4396,22 @@ class SettingsPage extends StatelessWidget {
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
+
       if (path == null) return;
+
       await File(path).writeAsString(r.body, flush: true);
-      if (context.mounted)
+
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cloud backup saved successfully.')),
         );
+      }
     } catch (e) {
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Cloud backup error: $e')));
-    }
-  }
-
-  Future<void> _restoreCloud(BuildContext context) async {
-    try {
-      if (!await confirmDialog(
-        context,
-        'Download the latest cloud backup and replace local workshop data?',
-      ))
-        return;
-      final s = await SyncService.settings();
-      final base = s['url'] ?? '';
-      final key = s['key'] ?? '';
-      if (base.isEmpty || key.isEmpty)
-        throw Exception('Cloud Sync is not configured.');
-      final r = await http
-          .get(
-            Uri.parse('$base/api/backup/export'),
-            headers: {'X-Sync-Key': key, 'Accept-Encoding': 'identity'},
-          )
-          .timeout(const Duration(seconds: 20));
-      if (r.statusCode >= 300)
-        throw Exception(
-          'Cloud restore download failed (${r.statusCode}): ${r.body}',
-        );
-      final body = _decodeJsonMap(r, 'Cloud backup');
-      final restored = <String, List<Map<String, dynamic>>>{
-        for (final x in moduleDefs) x.key: <Map<String, dynamic>>[],
-      };
-      for (final raw in (body['records'] as List? ?? const [])) {
-        final x = Map<String, dynamic>.from(raw as Map);
-        final module = x['module']?.toString() ?? '';
-        final data = Map<String, dynamic>.from(x['data'] as Map? ?? const {});
-        if (module.isEmpty || !restored.containsKey(module)) continue;
-        data['_id'] = x['id'] ?? data['_id'];
-        data['_updatedAt'] = x['updated_at'] ?? data['_updatedAt'];
-        if (x['deleted'] == true) data['_deleted'] = true;
-        restored[module]!.add(data);
       }
-      await LocalStore.replaceAll(restored);
-      if (context.mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cloud data restored successfully.')),
-        );
-    } catch (e) {
-      if (context.mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Cloud restore error: $e')));
     }
   }
 
@@ -4431,8 +4436,9 @@ class SettingsPage extends StatelessWidget {
       if (!await confirmDialog(
         context,
         'Restore backup and replace local workshop data?',
-      ))
+      )) {
         return;
+      }
       final restored = <String, List<Map<String, dynamic>>>{};
       for (final m in moduleDefs) {
         final value = raw[m.key];
@@ -4441,15 +4447,113 @@ class SettingsPage extends StatelessWidget {
             : <Map<String, dynamic>>[];
       }
       await LocalStore.replaceAll(restored);
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Backup restored successfully.')),
         );
+      }
     } catch (e) {
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Restore error: $e')));
+      }
+    }
+  }
+
+  Future<void> _restoreCloud(BuildContext context) async {
+    try {
+      final confirmed = await confirmDialog(
+        context,
+        'Download the latest cloud backup and replace local workshop data?',
+      );
+
+      if (!confirmed) return;
+
+      final s = await SyncService.settings();
+      final base = s['url'] ?? '';
+      final key = s['key'] ?? '';
+
+      if (base.isEmpty || key.isEmpty) {
+        throw Exception('Cloud Sync is not configured.');
+      }
+
+      final r = await http
+          .get(
+            Uri.parse('$base/api/backup/export'),
+            headers: {
+              'X-Sync-Key': key,
+              'Accept': 'application/json',
+              'Accept-Encoding': 'identity',
+            },
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (r.statusCode >= 300) {
+        throw Exception(
+          'Cloud restore download failed (${r.statusCode}): ${r.body}',
+        );
+      }
+
+      final body = _decodeJsonMap(r, 'Cloud backup');
+
+      final restored = <String, List<Map<String, dynamic>>>{
+        for (final x in moduleDefs) x.key: <Map<String, dynamic>>[],
+      };
+
+      final rawRecords = body['records'];
+
+      if (rawRecords is List) {
+        for (final raw in rawRecords) {
+          if (raw is! Map) continue;
+
+          final x = Map<String, dynamic>.from(raw);
+
+          final module = x['module']?.toString() ?? '';
+
+          if (module.isEmpty || !restored.containsKey(module)) {
+            continue;
+          }
+
+          final rawData = x['data'];
+
+          final data = rawData is Map
+              ? Map<String, dynamic>.from(rawData)
+              : <String, dynamic>{};
+
+          final id = x['id']?.toString() ?? data['_id']?.toString() ?? '';
+
+          if (id.isNotEmpty) {
+            data['_id'] = id;
+          }
+
+          final updatedAt = x['updated_at'] ?? data['_updatedAt'];
+
+          if (updatedAt != null) {
+            data['_updatedAt'] = updatedAt.toString();
+          }
+
+          if (x['deleted'] == true) {
+            data['_deleted'] = true;
+          }
+
+          restored[module]!.add(data);
+        }
+      }
+
+      await LocalStore.replaceAll(restored);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cloud data restored successfully.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Cloud restore error: $e')));
+      }
     }
   }
 
@@ -4469,39 +4573,51 @@ class SettingsPage extends StatelessWidget {
                     onPressed: onBack ?? () => Navigator.maybePop(context),
                     icon: const Icon(Icons.arrow_back),
                   ),
-                  const Text(
-                    'Settings',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
+                  const Expanded(
+                    child: Text(
+                      'Settings',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                 ],
               ),
+
               const Text(
                 'Dixit Motors Management App control center',
                 style: TextStyle(color: silver),
               ),
+
               const SizedBox(height: 20),
+
               _section('Workshop Identity', [
                 const ListTile(
+                  leading: Icon(Icons.people_alt_outlined),
                   title: Text('Owners'),
                   subtitle: Text('Dixit Sharma / Ashok Sharma'),
                 ),
                 const ListTile(
+                  leading: Icon(Icons.admin_panel_settings_outlined),
                   title: Text('Management App Managed By'),
                   subtitle: Text('Kavi Sharma'),
                 ),
                 const ListTile(
+                  leading: Icon(Icons.location_on_outlined),
                   title: Text('Workshop'),
                   subtitle: Text(
-                    'Near Vardhman Hospital, Thikaria, Banswara, Rajasthan 327001',
+                    'Near Vardhman Hospital, Thikaria, '
+                    'Banswara, Rajasthan 327001',
                   ),
                 ),
                 const ListTile(
+                  leading: Icon(Icons.phone_outlined),
                   title: Text('Contact'),
-                  subtitle: Text(
-                    '9549281415 ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ 9929125644 ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ 9462101890',
-                  ),
+                  subtitle: Text('9549281415 - 9929125644 - 9462101890'),
                 ),
               ]),
+
               _section('Backup & Safety', [
                 ListTile(
                   leading: const Icon(Icons.backup_outlined),
@@ -4536,23 +4652,39 @@ class SettingsPage extends StatelessWidget {
                   onTap: () => _restoreCloud(context),
                 ),
               ]),
+
               _section('Branding', [
-                Image.asset('assets/app_icon.png', height: 105),
+                Center(
+                  child: Image.asset(
+                    'assets/app_icon.png',
+                    height: 105,
+                    fit: BoxFit.contain,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                const Text(
-                  'DRIVE SAFE, WE CARE',
-                  style: TextStyle(
-                    color: brandRed,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2,
+                const Center(
+                  child: Text(
+                    'DRIVE SAFE, WE CARE',
+                    style: TextStyle(
+                      color: brandRed,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ),
               ]),
+
               const SizedBox(height: 15),
-              const Text(
-                'Fresh architecture ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Windows + Android ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Version 1.0.0',
-                style: TextStyle(color: silver, fontSize: 11),
+
+              const Center(
+                child: Text(
+                  'Fresh architecture - Windows + Android - Version 1.0.0',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: silver, fontSize: 11),
+                ),
               ),
+
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -4560,27 +4692,29 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _section(String title, List<Widget> children) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: panel,
-      borderRadius: BorderRadius.circular(18),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(6),
-          child: Text(
-            title,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+  Widget _section(String title, List<Widget> children) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: panel,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(6),
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
           ),
-        ),
-        ...children,
-      ],
-    ),
-  );
+          ...children,
+        ],
+      ),
+    );
+  }
 }
 
 Future<bool> confirmDialog(BuildContext context, String text) async {
