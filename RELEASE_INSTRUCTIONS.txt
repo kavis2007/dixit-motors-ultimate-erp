@@ -1,0 +1,34 @@
+DIXIT MOTORS MANAGEMENT APP — WINDOWS RELEASE
+
+This package was rebuilt from the uploaded project.
+
+Fixed in this release:
+1. Removed unsafe background SyncService.catchError usage.
+2. Background cloud sync is now explicitly guarded so async sync failures do not become unhandled exceptions.
+3. Cloud registration/push/pull JSON is decoded from response bytes safely.
+4. UTF-8 BOM/whitespace is handled.
+5. Non-JSON server responses are converted to normal application errors instead of raw FormatException.
+6. HTTP compression is handled by a Windows IOClient.
+7. Cloud heartbeat remains best-effort and cannot fail the completed sync.
+8. Main app network JSON parsing uses the same safe response handling.
+9. The existing Render API URL is preserved:
+   https://dixit-motors-erp-api.onrender.com
+10. The Sync Key is NOT changed.
+
+IMPORTANT:
+This environment does not contain the user's Windows Flutter SDK, so an actual Windows .exe cannot be compiled here. The included BUILD_WINDOWS_RELEASE.bat performs the final compile on the laptop using the installed Flutter SDK.
+
+LAPTOP STEPS:
+1. Extract this ZIP to a new folder.
+2. Open PowerShell in that folder.
+3. Double-click BUILD_WINDOWS_RELEASE.bat OR run:
+      .\BUILD_WINDOWS_RELEASE.bat
+4. The script stops if `flutter analyze` reports a real error.
+5. If successful, the EXE will be:
+      build\windows\x64\runner\Release\dixit_motors_management_app.exe
+6. Copy the ENTIRE Release folder, not only the EXE.
+
+CLOUD:
+The app keeps the existing Render API URL. If cloud settings are already saved on the laptop, they remain in SharedPreferences. Do not replace the Sync Key with a placeholder.
+
+If a runtime error still appears after a successful `flutter analyze` and release build, capture the exact error from the Release build; do not merge older project ZIPs back into this project.

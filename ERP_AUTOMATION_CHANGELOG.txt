@@ -1,0 +1,22 @@
+Dixit Motors ERP Automation Update
+=====================================
+
+Base: Dixit_Motors_Management_App_WINDOWS_FINAL_RELEASE.zip
+
+Added without replacing the existing project structure:
+- Dashboard global search with clickable results.
+- Vehicle 360 lookup for vehicle-number searches.
+- Automatic Job Card Date / Day / Time fields.
+- Invoice Job No. lookup continues to auto-fill customer/vehicle/KM/work and now stores invoice day/time.
+- Invoice PDF now saves locally using Owner_CarNumber.pdf and includes date/day/time.
+- Invoice item usage automatically adjusts matching inventory stock; invoice edits apply stock delta.
+- Purchase entries automatically increase matching inventory stock.
+- Dashboard automatic today/low-stock/weekly insight cards.
+- Dedicated Monday-Sunday Analytics page with vehicles/jobs/invoices/revenue/parts-used.
+- Purchase Bill Scanner page (Android OCR; Windows stores selected bill for review).
+- Logout / Close Session option in Settings.
+- Existing Add New Item/autocomplete invoice workflow retained and cleaned.
+
+Important:
+- Windows OCR for supplier bills is not claimed as fully automatic in this build; the scanner stores the selected bill for review on Windows.
+- The source was not compiled in this Linux sandbox because Flutter/Dart SDK is not installed here. Run flutter analyze, flutter test, and flutter build windows --release on the Windows development machine before replacing the production build.

@@ -1,0 +1,12 @@
+﻿.dart_tool/
+build/
+installer_output/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.log
+
+# Local backup/debug files
+lib/*.bak
+lib/services/*BACKUP*
+lib/services/*backup*
+lib/services/*jsonmap*
