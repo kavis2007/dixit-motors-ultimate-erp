@@ -12,7 +12,10 @@ load_dotenv()
 SYNC_KEY=os.getenv('DIXIT_SYNC_KEY','CHANGE_THIS_TO_A_LONG_RANDOM_KEY')
 DB_URL=os.getenv('DIXIT_DATABASE_URL','sqlite:///./dixit_ultimate.db')
 connect_args={'check_same_thread':False} if DB_URL.startswith('sqlite') else {}
-engine=create_engine(DB_URL, connect_args=connect_args)
+engine = create_engine(
+    DB_URL,
+    connect_args=connect_args,
+)
 
 class Base(DeclarativeBase): pass
 class DeviceRecord(Base):
@@ -76,22 +79,50 @@ class DeviceRegister(BaseModel):
     user_name: str = 'Dixit User'
 
 @app.post('/api/devices/register')
-def device_register(body: DeviceRegister, x_sync_key: str|None=Header(default=None,alias='X-Sync-Key')):
+def device_register(
+    body: DeviceRegister,
+    x_sync_key: str | None = Header(
+        default=None,
+        alias='X-Sync-Key'
+    )
+):
     auth(x_sync_key)
-    now=datetime.now(timezone.utc)
+
+    now = datetime.now(timezone.utc)
+
     with Session(engine) as db:
-        row=db.get(DeviceRecord, body.device_id)
+        row = db.get(DeviceRecord, body.device_id)
+
         if row:
             if row.status == 'blocked':
-                raise HTTPException(403,'DEVICE_BLOCKED')
-            row.device_name=body.device_name
-            row.user_name=body.user_name
-            row.last_seen=now
+                raise HTTPException(403, 'DEVICE_BLOCKED')
+
+            row.device_name = body.device_name
+            row.user_name = body.user_name
+            row.last_seen = now
+
+            status = row.status or 'active'
+
         else:
-            row=DeviceRecord(device_id=body.device_id,device_name=body.device_name,user_name=body.user_name,status='active',last_seen=now,created_at=now)
+            row = DeviceRecord(
+                device_id=body.device_id,
+                device_name=body.device_name,
+                user_name=body.user_name,
+                status='active',
+                last_seen=now,
+                created_at=now,
+            )
+
             db.add(row)
+            status = 'active'
+
         db.commit()
-    return {'ok':True,'device_id':body.device_id,'status':row.status}
+
+    return {
+        'ok': True,
+        'device_id': body.device_id,
+        'status': status,
+    }
 
 class DeviceHeartbeat(BaseModel):
     device_id: str
