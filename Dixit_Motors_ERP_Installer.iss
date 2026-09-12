@@ -8,6 +8,7 @@ AppId={{DIXIT-MOTORS-ERP-2026}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
+
 DefaultDirName={autopf}\Dixit Motors ERP
 DefaultGroupName={#MyAppName}
 
@@ -18,7 +19,7 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 
 SetupIconFile=windows\runner\resources\app_icon.ico

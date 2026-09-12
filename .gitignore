@@ -14,3 +14,11 @@ sync_debug.log
 sync_full.log
 
 installer_output/
+
+android/key.properties
+android/key/*.jks
+
+# Backup and generated files
+*.bak
+*backup*
+android/.kotlin/

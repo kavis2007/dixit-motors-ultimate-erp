@@ -1,10 +1,21 @@
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:dixit_motors_management_app/main.dart';
+import '../lib/main.dart';
 
 void main() {
-  testWidgets('Dixit Motors app smoke test', (WidgetTester tester) async {
+  testWidgets('Dixit Motors welcome and dashboard smoke test', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const DixitMotorsApp());
-    expect(find.text('DIXIT MOTORS'), findsWidgets);
+
+    // Startup splash
+    expect(find.text('WELCOME TO DIXIT MOTORS'), findsOneWidget);
+    expect(find.text('Dixit Motors Car Workshop'), findsOneWidget);
+
+    // Wait for splash to finish.
+    await tester.pump(const Duration(milliseconds: 2600));
+    await tester.pumpAndSettle();
+
+    // Dashboard
+    expect(find.text('Workshop Command Center'), findsOneWidget);
   });
 }
