@@ -22,3 +22,6 @@ android/key/*.jks
 *.bak
 *backup*
 android/.kotlin/
+
+# Local backup files
+lib/main.dart.*
